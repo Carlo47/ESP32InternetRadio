@@ -60,8 +60,8 @@
 Audio audio;
 
 // WiFi credentials 
-const char ssid[]     = "Dodeka2G4";
-const char password[] = "5408EnnetbadenHoehtalstrasse13";
+const char ssid[]     = "Your SSID";
+const char password[] = "Your Password";
 const char hostname[] = "esp32-radio";
 
 // Example texts for text-to-speech demo
