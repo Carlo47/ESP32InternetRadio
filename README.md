@@ -17,7 +17,7 @@ It allows the
  * display of the currently played radio station
  * redisplaying the menu
 
- ![CLI-Menu](cliMenuESP32InternetRadio.jpg)
+ ![CLI-Menu](images/cli.jpg)
 
 ### Operation with external Max98357
  ```
