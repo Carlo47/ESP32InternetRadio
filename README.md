@@ -1,6 +1,6 @@
 # ESP32InternetRadio
 
-This program shows how to use the [**ESP32-audioI2S**](https://github.com/schreibfaul1?tab=repositories) library to build a internet radio. 
+This program shows how to use the [**ESP32-audioI2S**](https://github.com/schreibfaul1?tab=repositories) library to build an internet radio. 
 It is an adaptation of the example program *Simple_WiFi_Radio*.
 I used a MAX98357A DAC/Amplifier in mono configuration.
 In contrast to the internet radio with the ESP8266, the serial 
@@ -19,7 +19,7 @@ It allows the
 
  ![CLI-Menu](images/cli.jpg)
 
-### Operation with external Max98357
+### Operation with external Max98357 I2S DAC
  ```
  Wiring                            .-----------------. 
                GPIO_NUM_25 -->     o LRC             |  
@@ -34,4 +34,4 @@ It allows the
 👉 With exactly the same wiring you can also connect a 
                  UDA1334A I2S DAC with stereo output for headphones
 
- To run update the WiFi credentials and compile
+To run the program, enter your WiFi credentials and compile the code.

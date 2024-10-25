@@ -1,6 +1,7 @@
 /**
- * Program      esp32InternetRadioMax98357.cpp
+ * Program      Esp32InternetRadio 
  * Author       2021-07-27 Charles Geiser (https://www.dodeka.ch)
+ *              2024-10-24 Menu structure redesigned
  * 
  * Purpose      This program shows how to use the ESP32-audioI2S library 
  *              from "Wolle" aka "schreibfaul" to build a internet radio 
@@ -52,16 +53,29 @@
 #define I2S_BCLK       GPIO_NUM_26  // BCLK     "
 #define I2S_DOUT       GPIO_NUM_27  // DIN      "
 
-#define CLEAR_LINE     Serial.printf("\r%*s\r", 128, "")
+#define CLEAR_LINE     Serial.printf("\r%*c\r", 80, ' ')
 #define MIN_VOLUME     0
 #define MAX_VOLUME     21
 #define DEFAULT_VOLUME 10
 
-Audio audio;
+extern void heartbeat(uint8_t pin, uint8_t nBeats, uint8_t t, uint8_t duty);
+extern bool initWiFi(const char ssid[], const char password[], const char hostname[]);
+extern void printNearbyNetworks();
+extern void printConnectionDetails();
+
+void decrementVolume(const char*);
+void incrementVolume(const char*);
+void playRadio(const char*);
+void showCurrentStation(const char*);
+void showMenu(const char*);
+void textToSpeachDe(const char*);
+void textToSpeachEn(const char*);
+void textToSpeachIt(const char*);
+void toggleSpeaker(const char*);
 
 // WiFi credentials 
-const char ssid[]     = "Your SSID";
-const char password[] = "Your Password";
+const char ssid[]     = "DodekaGast";
+const char password[] = "episkeptes";
 const char hostname[] = "esp32-radio";
 
 // Example texts for text-to-speech demo
@@ -71,61 +85,67 @@ const char *text[]     = {
 "Internet radio (anche web radio) è il termine usato per descrivere una gamma di programmi radiofonici su Internet.",
 };
 
-typedef struct { const char key; const char *name; const char *url; } Radiostation;
-Radiostation station[] =
+Audio audio;
+
+// Definition of the action and the menuitem
+using Action = void(&)(const char*);
+using MenuItem =  struct mi{ const char key; const char *txt; const char* arg; Action action; };
+
+MenuItem menu[] =
 {
-  { '0', "Klassik Radio",     "http://stream.klassikradio.de/live/mp3-128/stream.klassikradio.de" },
-  { '1', "SRF1 AG-SO",        "http://stream.srg-ssr.ch/m/regi_ag_so/mp3_128" },
-  { '2', "SRF2",              "http://stream.srg-ssr.ch/m/drs2/mp3_128" },
-  { '3', "SRF3",              "http://stream.srg-ssr.ch/m/drs3/mp3_128" },
-  { '4', "SRF4 News",         "http://stream.srg-ssr.ch/m/drs4news/mp3_128" },
-  { '5', "Swiss Classic",     "http://stream.srg-ssr.ch/m/rsc_de/mp3_128" },
-  { '6', "Swiss Jazz",        "http://stream.srg-ssr.ch/m/rsj/mp3_128" },
-  { '7', "SRF Musikwelle",    "http://stream.srg-ssr.ch/m/drsmw/mp3_128" },
-  { '8', "Alles Blasmusik",   "http://stream.bayerwaldradio.com/allesblasmusik" },
-  { '9', "WKVI-AM",           "http://kvbstreams.dyndns.org:8000/wkvi-am" },
-  { 'a', "DLF",               "http://st01.dlf.de/dlf/01/128/mp3/stream.mp3" },
-  { 'b', "WDR 1 Live",        "http://www.wdr.de/wdrlive/media/einslive.m3u" },
-  { 'c', "SWR1 BW",           "http://mp3-live.swr.de/swr1bw_m.m3u" },
-  { 'd', "SWR2",              "http://mp3-live.swr.de/swr2_m.m3u" },
-  { 'e', "SWR3",              "http://mp3-live.swr3.de/swr3_m.m3u" },
-  { 'f', "SWR4 BW",           "http://mp3-live.swr.de/swr4bw_m.m3u" },
-  { 'g', "SWR Aktuell",       "http://mp3-live.swr.de/swraktuell_m.m3u" },
-  { 'h', "DasDing",           "http://mp3-live.dasding.de/dasding_m.m3u" },
-  { 'i', "Jazz MMX",          "http://jazz.streamr.ru/jazz-64.mp3" },
-  { 'j', "Irish Pub Radio",   "http://macslons-irish-pub-radio.com/media.asx" },
-  { 'k', "HIT Radio FFH MP3", "http://mp3.ffh.de/radioffh/hqlivestream.mp3" },
-  { 'l', "Capital London",    "http://vis.media-ice.musicradio.com/CapitalMP3" },
-  { 'm', "ORF",               "https://orf-live.ors-shoutcast.at/vbg-q1a" },
-  { 'n', "Beatles Radio",     "http://www.beatlesradio.com:8000/stream/1/" },
-  { '!', "Speech 1",              "" },
-  { '.', "Speech 2",              "" },
-  { ',', "Speech 3",              "" },
-  { '+', "Increment volume",      "" },
-  { '-', "Decrement volume",      "" },
-  { 'T', "Toggle speaker on/off", "" },
-  { 'C', "Show current Station",  "" },
-  { 'S', "Show Menu",             "" },
+  { '0', "MDR-Klassik",       "http://mdr-284350-0.cast.mdr.de/mdr/284350/0/mp3/high/stream.mp3", playRadio },
+  { '1', "SRF1 AG-SO",        "http://stream.srg-ssr.ch/m/regi_ag_so/mp3_128",  playRadio },
+  { '2', "SRF2",              "http://stream.srg-ssr.ch/m/drs2/mp3_128",        playRadio },
+  { '3', "SRF3",              "http://stream.srg-ssr.ch/m/drs3/mp3_128",        playRadio },
+  { '4', "SRF4 News",         "http://stream.srg-ssr.ch/m/drs4news/mp3_128",    playRadio },
+  { '5', "Swiss Classic",     "http://stream.srg-ssr.ch/m/rsc_de/mp3_128",      playRadio },
+  { '6', "Swiss Jazz",        "http://stream.srg-ssr.ch/m/rsj/mp3_128",         playRadio },
+  { '7', "SRF Musikwelle",    "http://stream.srg-ssr.ch/m/drsmw/mp3_128",       playRadio },
+  { '8', "Alles Blasmusik",   "http://stream.bayerwaldradio.com/allesblasmusik", playRadio },
+  { '9', "WKVI-AM",           "http://kvbstreams.dyndns.org:8000/wkvi-am",      playRadio },
+  { 'a', "DLF",               "http://st01.dlf.de/dlf/01/128/mp3/stream.mp3",   playRadio },
+  { 'b', "WDR 1 Live",        "http://www.wdr.de/wdrlive/media/einslive.m3u",   playRadio },
+  { 'c', "SWR1 BW",           "https://liveradio.swr.de/sw282p3/swr1bw/",       playRadio },
+  { 'd', "SWR2",              "https://liveradio.swr.de/sw282p3/swr2/",         playRadio },
+  { 'e', "SWR3",              "https://liveradio.swr.de/sw282p3/swr3/",         playRadio },
+  { 'f', "SWR4 BW",           "https://liveradio.swr.de/sw282p3/swr4bw/",       playRadio },
+  { 'g', "BR Klassik",        "https://dispatcher.rndfnk.com/br/brklassik/live/mp3/mid", playRadio },
+  { 'h', "Blues Mobile",      "https://strm112.1.fm/blues_mobile_mp3",          playRadio },
+  { 'i', "Jazz MMX",          "http://jazz.streamr.ru/jazz-64.mp3",             playRadio },
+  { 'j', "Radio Classique",   "http://radioclassique.ice.infomaniak.ch/radioclassique-high.mp3",  playRadio },
+  { 'k', "HIT Radio FFH MP3", "http://mp3.ffh.de/radioffh/hqlivestream.mp3",    playRadio },
+  { 'l', "Capital London",    "http://vis.media-ice.musicradio.com/CapitalMP3", playRadio },
+  { 'm', "ORF",               "https://orf-live.ors-shoutcast.at/vbg-q1a",      playRadio },
+  { 'n', "Beatles Radio",     "http://www.beatlesradio.com:8000/stream/1/",     playRadio },
+  { '!', "Text to speach en",     text[0], textToSpeachEn },
+  { '.', "Text to speach de",     text[1], textToSpeachDe },
+  { ',', "Text to speach it",     text[2], textToSpeachIt },
+  { '+', "Increment volume",      "", incrementVolume },
+  { '-', "Decrement volume",      "", decrementVolume },
+  { 'T', "Toggle speaker on/off", "", toggleSpeaker },
+  { 'C', "Show current Station",  "", showCurrentStation },
+  { 'S', "Show Menu",             "", showMenu },
 };
-constexpr uint8_t nbrRadiostations = sizeof(station) / sizeof(station[0]);
+constexpr uint8_t nbrMenuItems = sizeof(menu) / sizeof(menu[0]);
 
 int currentStation     = 5;  // preselect Swiss Classic
-const char *currentUrl = station[currentStation].url;
+const char *currentUrl = menu[currentStation].arg;
 int currentVolume      = DEFAULT_VOLUME;
 
 /**
  * Print name and url of current station
  */
-void showCurrentStation() 
+void showCurrentStation(const char* txt) 
 {
   CLEAR_LINE;
-  Serial.printf("Current Station: %s --> %s", station[currentStation].name, currentUrl);
+  Serial.printf("Current Station: %s --> %s", menu[currentStation].txt, currentUrl);
 };
+
 
 /**
  * Display menu on monitor
  */
-void showMenu()
+void showMenu(const char* txt)
 {
   // title is packed into a formatted raw string
   Serial.print(
@@ -135,17 +155,18 @@ void showMenu()
 -----------------
 )TITLE");
 
-  for (int i = 0; i < nbrRadiostations; i++)
+  for (int i = 0; i < nbrMenuItems; i++)
   {
-    Serial.printf("[%c] %s\n", station[i].key, station[i].name);
+    Serial.printf("[%c] %s\n", menu[i].key, menu[i].txt);
   }
   Serial.print("\nPress a key: ");
 }
 
+
 /**
  * Set volum to the next higher level (0..21)
  */
-void incrementVolume()
+void incrementVolume(const char* txt)
 {
   if (currentVolume < MAX_VOLUME) 
   {
@@ -156,10 +177,11 @@ void incrementVolume()
   Serial.printf("Current Volume: %d", currentVolume);
 }
 
+
 /**
  * Set the volume to the next lower level (0..21)
  */
-void decrementVolume()
+void decrementVolume(const char* txt)
 {
   if (currentVolume > 0) 
   {
@@ -170,12 +192,13 @@ void decrementVolume()
   Serial.printf("Current Volume: %d", currentVolume);
 }
 
+
 /**
  * Toggle speaker on and off
- * When speaker os off and volume is at minimal value
+ * When speaker is off and volume is at minimal value
  * the default volume is set when speaker is toggled on
  */
-void toggleSpeaker()
+void toggleSpeaker(const char* txt)
 {
   static bool spkrIsOn = true;
   if (spkrIsOn)
@@ -195,6 +218,31 @@ void toggleSpeaker()
   }
 }
 
+
+void playRadio(const char* txt)
+{
+  audio.connecttohost(txt);
+}
+
+
+void textToSpeachDe(const char* txt)
+{
+  audio.connecttospeech(txt, "de");
+}
+
+
+void textToSpeachEn(const char* txt)
+{
+  audio.connecttospeech(txt, "en");
+}
+
+
+void textToSpeachIt(const char* txt)
+{
+  audio.connecttospeech(txt, "it");
+}
+
+
 /**
  * Get the keystroke from the operator and 
  * perform the corresponding action
@@ -204,90 +252,17 @@ void doMenu()
   char key = Serial.read();
   CLEAR_LINE;
 
-  for (int i = 0; i < nbrRadiostations; i++)
+  for (int i = 0; i < nbrMenuItems; i++)
   {
-    if (key == station[i].key)
+    if (key == menu[i].key)
     {
-      switch(key)
-      {
-        case 'S':
-          showMenu();
-        break;
-        case 'C':
-          showCurrentStation();
-        break;
-        case 'T':
-          toggleSpeaker();
-        break;
-        case '!':
-          audio.connecttospeech(text[0], "en");
-        break;
-        case '.':
-          audio.connecttospeech(text[1], "de");
-        break;
-        case ',':
-          audio.connecttospeech(text[2], "it");
-        break;        
-        case '+':
-          incrementVolume();
-        break;
-        case '-':
-          decrementVolume();
-        break;
-        default:
-          currentStation = i;
-          currentUrl = station[i].url;
-          audio.connecttohost(currentUrl);
-        break;  
-      }
-
-      break; // for loop
+      menu[i].action(menu[i].arg);
+      break;
     }
   } 
 }
 
-/**
- * Use a raw string literal to print a formatted
- * string of WiFi connection details
- */
-void printConnectionDetails()
-{
-  Serial.printf(R"(
-Connection Details:
-------------------
-  SSID       : %s
-  Hostname   : %s
-  IP-Address : %s
-  MAC-Address: %s
-  RSSI       : %d (received signal strength indicator)
-  )", WiFi.SSID().c_str(),
-      //WiFi.hostname().c_str(),  // ESP8266
-      WiFi.getHostname(),    // ESP32 
-      WiFi.localIP().toString().c_str(),
-      WiFi.macAddress().c_str(),
-      WiFi.RSSI());
-  Serial.printf("\n");  
-}
 
-/**
- * Establish the WiFi connection
- */
-void initWiFi()
-{
-  Serial.println("Connecting to WiFi");
-  WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE);  // this line only needed for ESP32 to set the hostname
-  WiFi.setHostname(hostname);
-  WiFi.begin(ssid, password);
-
-  // Try forever
-  while (WiFi.status() != WL_CONNECTED) 
-  {
-    Serial.println("...Connecting to WiFi");
-    delay(1000);
-  }
-  Serial.println("Connected");
-  printConnectionDetails();
-}
 
 /**
  * Initialize the audio subsystem
@@ -309,13 +284,23 @@ bool waitIsOver(uint32_t &msPrevious, uint32_t msWait)
   return (millis() - msPrevious >= msWait) ? (msPrevious = millis(), true) : false;
 }
 
+
 void setup() 
 {
     Serial.begin(115200);
-    initWiFi();
+    pinMode(LED_BUILTIN, OUTPUT);
+
+    if (! initWiFi(ssid, password, hostname))
+    { 
+      log_e("==> Connection to WLAN failed");
+      while(true) heartbeat(LED_BUILTIN, 3, 1, 5);
+    };
+    printNearbyNetworks();
+    printConnectionDetails();
     initAudio();
 }
  
+
 void loop()
 {
     static uint32_t msPrevious = millis();
@@ -324,7 +309,7 @@ void loop()
     audio.loop();
 
     // show menu once after all status and info messages have been displayed
-    if (!done && waitIsOver(msPrevious, 5000)) { done = true; showMenu(); }
+    if (!done && waitIsOver(msPrevious, 5000)) { done = true; showMenu(""); }
 
     // handle keystrokes and the menu
     if (Serial.available()) doMenu();    
