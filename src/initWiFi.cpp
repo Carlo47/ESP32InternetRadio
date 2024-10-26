@@ -1,11 +1,6 @@
 #include <Arduino.h>
 #include <WiFi.h>
 
-// WiFi credentials 
-extern const char ssid[];
-extern const char password[];
-
-
 /**
  * Print nearby WiFi networks with SSID und RSSI 
  */
