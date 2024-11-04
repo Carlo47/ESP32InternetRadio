@@ -6,7 +6,7 @@
  * Purpose      This program shows how to use the ESP32-audioI2S library 
  *              from "Wolle" aka "schreibfaul" to build a internet radio 
  *              It is an adaptation of his example program "Simple_WiFi_Radio".
- *              I used a MAX98357A DAC/Amplifier in mono configuration.
+ *              I used two MAX98357A DAC/Amplifier in stereo configuration.
  *              In contrast to the internet radio with the ESP8266, the serial 
  *              interface is available for inputs and outputs with the ESP32. 
  *              Therefore I designed the user interface as a simple CLI menu. 
@@ -28,13 +28,50 @@
  *               GPIO_NUM_26 -->     o BCLK       MAX  |
  *               GPIO_NUM_27 -->     o DIN       98357 |
  *                                   o Gain            |   Spkr
- *                                   o SD              |    _/|
+ *                shutdown / mode -- o SD              |    _/|
  *                       GND -->     o GND             o---|  |
  *                       5V  -->     o Vin (5V)        o---|_ |
  *                                   `-----------------´     \|
  * 
- *              👉 With exactly the same wiring you can also connect a 
- *                 UDA1334A I2S DAC with stereo output for headphones 
+ *              The shutdown pin SD has 4 functions, namely:                   optimal value
+ *              1. Shutdown Mode               80.. 355mV < Vsd                 ==> 0V (GND)
+ *              2. Mono Mode (Left+Right)/2    80.. 355mV < Vsd <  650..825mV   ==> 502.5mV
+ *              3. Right Channel              650.. 825mV < Vsd < 1245..1500mV  ==> 1035mV
+ *              4. Left Channel              1245..1500mV < Vsd < Vin           ==> 2000mV (safe choice)       
+ * 
+ *              If pin SD is left open, the on board voltage divider 100k/1000k determines  
+ *              the voltage at the pin and the voltage Vsd = Vcc/11 = 5000/11 = 454mV is set. 
+ *              Vsd is therefore within the permissible range for mono mode, slightly 
+ *              below the optimum value of 502mV.
+ * 
+ *              For the right channel, we need to set an optimum voltage Vsd = 1035mV. 
+ *              If we use a resistor of 560k in parallel with the built-in 1000k resistor, 
+ *              we obtain a total resistance of 359k. This results in a voltage 
+ *              Vsd = 5000 * 100 / 459 = 1089mv, which is within the permissible range, 
+ *              slightly above the optimum value.
+ * 
+ *              To select the left channel, we connect 180k in parallel, thus obtaining 
+ *              the total resistance of 152k and a voltage Vsd = 5000 * 100 / 252 = 1984mV, 
+ *              which is in the safe range above the required value of 1500mV.    
+ * 
+ *              ---+-- Vin = 5V
+ *                 |
+ *             .---+  
+ *             |   | 
+ *            .-. .-. 
+ *         Rs | | | | 1000k
+ *            '-' '-'
+ *             |   |          
+ *             '---+ 
+ *                 |          1500 < Vs < 5000 mv (left  chn, optimal 2000 mV) ==> Rs = 180k
+ *           SD o--+---> Vs =  825 < Vs < 1245 mv (right chn, optimal 1035 mV) ==> Rs = 560k
+ *                 |           355 < Vs <  650 mv (mono       optimal  502 mv) ==> Rs = no Rs
+ *                .-.
+ *                | |100k
+ *                '-'
+ *                 |
+ *              ---+--- GND
+ *   
  *  
  * Remarks      To run update the WiFi credentials and compile
  *
