@@ -2,7 +2,8 @@
 
 This program shows how to use the [**ESP32-audioI2S**](https://github.com/schreibfaul1?tab=repositories) library to build an internet radio. 
 It is an adaptation of the example program *Simple_WiFi_Radio*.
-I used a MAX98357A DAC/Amplifier in mono configuration.
+I used a I2S MAX98357A PCM Class D Amplifier in mono configuration and also
+tried stereo sound with two MAX98357A.
 In contrast to the internet radio with the ESP8266, the serial 
 interface is available for inputs and outputs with the ESP32. 
 Therefore I designed the user interface as a simple CLI menu. 
@@ -11,6 +12,7 @@ It allows the
 
  * selection of 24 radio stations (easy to expand)
  * text-to-speech output with 3 examples in the languages English, German, Italian
+ * stereo test to check both channels
  * volume control up and down
  * switching on and off of the loudspeaker 
  * display of the currently played radio station
@@ -18,14 +20,14 @@ It allows the
 
  ![CLI-Menu](images/cli.jpg)
 
-## Operation with external Max98357 I2S DAC
+## Operation with external Max98357A
  ```
  Wiring                            .-----------------. 
                GPIO_NUM_25 -->     o LRC             |  
                GPIO_NUM_26 -->     o BCLK       MAX  |
                GPIO_NUM_27 -->     o DIN       98357 |
                                    o Gain            |   Spkr
-                                   o SD              |    _/|
+               5V Vin ---[ Rs ]----o SD              |    _/|
                        GND -->     o GND             o---|  |
                        5V  -->     o Vin (5V)        o---|_ |
                                    `-----------------´     \|
@@ -91,5 +93,35 @@ and finally we get
 
 $R_s(V_{SD}) = \frac{R_1}{\frac{R_1}{R_0} \cdot \frac{V_{SD}}{V_{in} - V{SD}} - 1}$
 
+or
+
 $V_{SD}(R_s) = V_{in} \cdot \frac{1}{\frac{R_s \cdot R1}{R_0 \cdot (R_s+R_1)}+1}$
+
+### Stereo test
+For the stereo test, I created a file *stereotest440-445.mp3* with Audacity: 
+
+![stereo1](images/stereotest1.jpg)
+
+In the upper left channel there are 4 clips with 440 Hz sine waves, in the 
+lower right channel the same number of clips with 445 Hz. The first 3 clips 
+sound alternately left then right and the last two together, resulting in a 
+clearly audible beat of 5 Hz.
+
+The next image shows an enlarged section of the transition from the left to the right channel after 1 second. 
+
+![stereo2](images/stereotest2.jpg)
+
+This arrangement makes it easy to check whether the shunt resistors for 
+selecting the stereo channels are correctly dimensioned.
+
+The file stereotest440-445.mp3 is located in the data folder and must be 
+loaded before compilation with *Upload Filesystem Image* into SPIFFS.
+
+### platformio.ini
+
+The partition scheme for large applications must be defined in the 
+*platformio.ini* configuration file, otherwise the available program memory 
+will be too small. You have to add the following line:
+
+*board_build.partitions = huge_app.csv*
 

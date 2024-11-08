@@ -103,6 +103,7 @@ extern void printConnectionDetails();
 void decrementVolume(const char*);
 void incrementVolume(const char*);
 void playRadio(const char*);
+void playMP3(const char*);
 void showCurrentStation(const char*);
 void showMenu(const char*);
 void textToSpeachDe(const char*);
@@ -116,10 +117,10 @@ const char password[] = "episkeptes";
 const char hostname[] = "esp32-radio";
 
 // Example texts for text-to-speech demo
-const char *text[]     = {
-"Internet radio (also web radio, net radio, streaming radio, e-radio, IP radio, online radio) is a digital audio service transmitted via the Internet.",
-"Als Internetradio (auch Webradio) bezeichnet man ein Internet-basiertes Angebot an Hörfunksendungen.",
-"Internet radio (anche web radio) è il termine usato per descrivere una gamma di programmi radiofonici su Internet.",
+const char *text[] = PROGMEM {
+"Internet radio (also web radio, net radio, streaming radio, e-radio, IP radio, online radio) is a digital audio service transmitted via the Internet",
+"Als Internetradio (auch Webradio) bezeichnet man ein Internet-basiertes Angebot an Hörfunksendungen",
+"Internet radio (anche web radio) è il termine usato per descrivere una gamma di programmi radiofonici su Internet",
 };
 
 Audio audio;
@@ -157,6 +158,7 @@ MenuItem menu[] =
   { '!', "Text to speach en",     text[0], textToSpeachEn },
   { '.', "Text to speach de",     text[1], textToSpeachDe },
   { ',', "Text to speach it",     text[2], textToSpeachIt },
+  { 't', "Test stereo channels", "/stereotest440-445.mp3", playMP3 },
   { '+', "Increment volume",      "", incrementVolume },
   { '-', "Decrement volume",      "", decrementVolume },
   { 'T', "Toggle speaker on/off", "", toggleSpeaker },
@@ -261,6 +263,10 @@ void playRadio(const char* txt)
   audio.connecttohost(txt);
 }
 
+void playMP3(const char* file)
+{
+  audio.connecttoFS(SPIFFS, file);   
+}
 
 void textToSpeachDe(const char* txt)
 {
@@ -306,9 +312,18 @@ void doMenu()
  */
 void initAudio()
 {
-    audio.setPinout(I2S_BCLK, I2S_LRC, I2S_DOUT);
-    audio.setVolume(currentVolume); // 0...21
-    audio.connecttohost(currentUrl);
+  audio.setPinout(I2S_BCLK, I2S_LRC, I2S_DOUT);
+  audio.setVolume(currentVolume); // 0...21
+  audio.connecttohost(currentUrl);
+
+/*   file = new AudioFileSourceSPIFFS("/stereotest440-445.mp3");
+  id3 = new AudioFileSourceID3(file);
+  id3->RegisterMetadataCB(MDCallback, (void*)"ID3TAG");
+  out = new AudioOutputI2S();
+  out->SetPinout(26,25,27);
+  out->SetGain(0.1);
+  mp3 = new AudioGeneratorMP3();
+  mp3->begin(id3, out);  */   
 }
 
 /**
@@ -332,6 +347,7 @@ void setup()
       log_e("==> Connection to WLAN failed");
       while(true) heartbeat(LED_BUILTIN, 3, 1, 5);
     };
+    SPIFFS.begin();
     printNearbyNetworks();
     printConnectionDetails();
     initAudio();
